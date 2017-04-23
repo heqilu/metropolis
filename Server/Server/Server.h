@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zmq.h"
 #include "common.h"
 #include <string>
 #include <thread>
@@ -22,6 +23,7 @@ public:
 private:
     void serve();
     void processReceivedMessage(zmq_msg_t* msg);
+    void getSendData(zmq_msg_t* msg);
 
     string  _address;
     uint16  _port;

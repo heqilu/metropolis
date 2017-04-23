@@ -1,5 +1,4 @@
 #include "Server.h"
-#include "zmq.h"
 #include <cstdio>
 #include <assert.h>
 
@@ -48,8 +47,10 @@ void Server::serve()
     _running = true;
     while (_running) {
         zmq_msg_t recvMsg;
+        zmq_msg_init(&recvMsg);
         rc = zmq_msg_recv(&recvMsg, socket, 0);
-        processReceivedMessage(&recvMsg);
+        if (rc != -1)
+            processReceivedMessage(&recvMsg);
         zmq_msg_close(&recvMsg);
 #ifdef DUMP
         if (rc != -1)
@@ -59,7 +60,7 @@ void Server::serve()
 #endif
 
         zmq_msg_t sendMsg;
-        void getSendData(zmq_msg_t* msg);
+        getSendData(&sendMsg);
         rc = zmq_msg_send(&sendMsg, socket, 0);
         zmq_msg_close(&sendMsg);
 #ifdef DUMP
@@ -85,6 +86,13 @@ void Server::processReceivedMessage(zmq_msg_t* msg)
     auto name = monster->name()->c_str();
 
     printf("received monster %s HP[%d] MANA[%d]\n", name, hp, mana);
+}
+
+void Server::getSendData(zmq_msg_t * msg)
+{
+    string idle("*IDLE*");
+    zmq_msg_init_size(msg, idle.size() + 1);
+    memcpy(zmq_msg_data(msg), idle.c_str(), idle.size() + 1);
 }
 
 void Server::stop()
