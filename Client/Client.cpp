@@ -1,13 +1,6 @@
 #include "Client.h"
 #include <assert.h>
 
-#ifdef _WINDOWS_
-#undef min
-#undef max
-#endif
-
-#include "monster_generated.h"
-
 using namespace MyGame::Sample; // Specified in the schema.
 
 namespace EveTrex {
@@ -36,16 +29,15 @@ void Client::serve()
     int timeout = 2000;
     _running = true;
     while (_running) {
-        zmq_msg_t sendMsg;
-        getSendData(&sendMsg);
-        rc = zmq_msg_send(&sendMsg, socket, 0);
+        flatbuffers::FlatBufferBuilder builder(1024);
+        getSendData(builder);
+        rc = zmq_send(socket, builder.GetBufferPointer(), builder.GetSize() + 1, 0);
 #ifdef DUMP
         if (rc != -1)
             printf("send[%d] %s\n", rc, zmq_msg_data(sendMsg));
         else
             printf("send timeout %d\n", timeout);
 #endif
-        zmq_msg_close(&sendMsg);
 
         zmq_pollitem_t items[] = {
             { socket, 0, ZMQ_POLLIN, 0 },
@@ -74,9 +66,8 @@ void Client::serve()
     zmq_close(socket);
 }
 
-void Client::getSendData(zmq_msg_t* msg)
+void Client::getSendData(flatbuffers::FlatBufferBuilder& builder)
 {
-    flatbuffers::FlatBufferBuilder builder(1024);
     auto weapon_one_name = builder.CreateString("Sword");
     short weapon_one_damage = 3;
     auto weapon_two_name = builder.CreateString("Axe");
@@ -85,11 +76,9 @@ void Client::getSendData(zmq_msg_t* msg)
     auto sword = CreateWeapon(builder, weapon_one_name, weapon_one_damage);
     auto axe = CreateWeapon(builder, weapon_two_name, weapon_two_damage);
 
-
     auto name = builder.CreateString("Orc");
     unsigned char treasure[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     auto inventory = builder.CreateVector(treasure, 10);
-
 
     std::vector<flatbuffers::Offset<Weapon>> weapons_vector;
     weapons_vector.push_back(sword);
@@ -107,11 +96,6 @@ void Client::getSendData(zmq_msg_t* msg)
         axe.Union());
 
     builder.Finish(orc);
-
-    uint8_t *buf = builder.GetBufferPointer();
-    int size = builder.GetSize();
-    zmq_msg_init_size(msg, size + 1);
-    memcpy(zmq_msg_data(msg), buf, size + 1);
 }
 
 void Client::stop()

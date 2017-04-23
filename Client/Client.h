@@ -2,6 +2,13 @@
 
 #include "common.h"
 #include "zmq.h"
+
+#ifdef _WINDOWS_
+#undef min
+#undef max
+#endif
+
+#include "monster_generated.h"
 #include <string>
 #include <thread>
 
@@ -22,7 +29,7 @@ namespace EveTrex {
 
     private:
         void serve();
-        void getSendData(zmq_msg_t* msg);
+        void getSendData(flatbuffers::FlatBufferBuilder& builder);
 
         string  _address;
         uint16  _port;
