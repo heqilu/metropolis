@@ -18,6 +18,9 @@ zmq_msg_init(&msg) && printf("zmq_msg_init: %s\n", zmq_strerror(errno)); \
 zmq_msg_init_size (&msg, size + 1) && printf("zmq_msg_init_size: %s\n",zmq_strerror(errno)); \
 memcpy(zmq_msg_data(&msg), data, size + 1);
 
+const string MsgHeader::Idle = "*IDLE*";
+const string MsgHeader::WriteMonster = "@MONSTER@";
+
 Server::Server(string address, uint16 port) :
     _address(address),
     _port(port),
@@ -45,13 +48,29 @@ void Server::serve()
     assert(rc == 0);
 
     _running = true;
+
+    int64_t more;
+    size_t more_size = sizeof more;
     while (_running) {
-        zmq_msg_t recvMsg;
-        zmq_msg_init(&recvMsg);
-        rc = zmq_msg_recv(&recvMsg, socket, 0);
+        zmq_msg_t msgHeader, msgData;
+        zmq_msg_init(&msgHeader);
+        zmq_msg_init(&msgData);
+
+        // All messages are grouped as header and data, but data could be null
+        rc = zmq_msg_recv(&msgHeader, socket, 0);
         if (rc != -1)
-            processReceivedMessage(&recvMsg);
-        zmq_msg_close(&recvMsg);
+            processReceivedHeader(&msgHeader);
+
+        zmq_getsockopt(socket, ZMQ_RCVMORE, &more, &more_size);
+
+        if (more) {
+            rc = zmq_msg_recv(&msgData, socket, 0);
+            if (rc != -1)
+                processReceivedMessage(&msgData);
+        }
+
+        zmq_msg_close(&msgData);
+        zmq_msg_close(&msgHeader);
 #ifdef DUMP
         if (rc != -1)
             printf("receive[%d] %s\n", rc, buffer);
@@ -74,6 +93,28 @@ void Server::serve()
     zmq_close(socket);
 }
 
+bool Server::isRead(const char* header)
+{
+    if (header == nullptr)
+        return false;
+
+    if (header[0] == '*')
+        return true;
+
+    return false;
+}
+
+bool Server::isWrite(const char* header)
+{
+    if (header == nullptr)
+        return false;
+
+    if (header[0] == '@')
+        return true;
+
+    return false;
+}
+
 void Server::processReceivedMessage(zmq_msg_t* msg)
 {
     char* buffer = (char*)zmq_msg_data(msg);
@@ -86,6 +127,23 @@ void Server::processReceivedMessage(zmq_msg_t* msg)
     auto name = monster->name()->c_str();
 
     printf("received monster %s HP[%d] MANA[%d]\n", name, hp, mana);
+}
+
+
+// return value indicates if there should be more message followed
+bool Server::processReceivedHeader(zmq_msg_t * msg)
+{
+    char* buffer = (char*)zmq_msg_data(msg);
+    if (isWrite(buffer))
+    {
+        if (strncmp(buffer, MsgHeader::WriteMonster.c_str(), MsgHeader::WriteMonster.size()) == 0) {
+            printf("Client wants to do %s\n", buffer);
+            return true;
+        }
+    }
+    
+    printf("Client only wants to %s\n", buffer);
+    return false;
 }
 
 void Server::getSendData(zmq_msg_t * msg)

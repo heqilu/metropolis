@@ -29,7 +29,8 @@ namespace EveTrex {
 
     private:
         void serve();
-        void getSendData(flatbuffers::FlatBufferBuilder& builder);
+        // return value tells if builder has some data to send
+        bool getSendData(flatbuffers::FlatBufferBuilder& builder, string& instruction);
 
         string  _address;
         uint16  _port;

@@ -10,6 +10,19 @@ using std::thread;
 
 namespace EveTrex {
 
+
+class MsgHeader
+{
+public:
+    const static string Idle;
+    const static string WriteMonster;
+};
+
+class Peer
+{
+
+};
+
 class Server
 {
 public:
@@ -23,6 +36,10 @@ public:
 private:
     void serve();
     void processReceivedMessage(zmq_msg_t* msg);
+    bool processReceivedHeader(zmq_msg_t* msg);
+
+    bool isRead(const char* header);
+    bool isWrite(const char* header);
     void getSendData(zmq_msg_t* msg);
 
     string  _address;

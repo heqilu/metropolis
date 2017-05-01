@@ -30,8 +30,17 @@ void Client::serve()
     _running = true;
     while (_running) {
         flatbuffers::FlatBufferBuilder builder(1024);
-        getSendData(builder);
-        rc = zmq_send(socket, builder.GetBufferPointer(), builder.GetSize() + 1, 0);
+        string instruction = "*IDLE*";
+        bool sendMore = false;
+        //sendMore = getSendData(builder, instruction);
+
+        if (sendMore) {
+            rc = zmq_send(socket, instruction.data(), instruction.size() + 1, ZMQ_SNDMORE);
+            rc = zmq_send(socket, builder.GetBufferPointer(), builder.GetSize() + 1, 0);
+        }
+        else
+            rc = zmq_send(socket, instruction.data(), instruction.size() + 1, 0);
+
 #ifdef DUMP
         if (rc != -1)
             printf("send[%d] %s\n", rc, zmq_msg_data(sendMsg));
@@ -66,7 +75,7 @@ void Client::serve()
     zmq_close(socket);
 }
 
-void Client::getSendData(flatbuffers::FlatBufferBuilder& builder)
+bool Client::getSendData(flatbuffers::FlatBufferBuilder& builder, string& instruction)
 {
     auto weapon_one_name = builder.CreateString("Sword");
     short weapon_one_damage = 3;
@@ -96,6 +105,9 @@ void Client::getSendData(flatbuffers::FlatBufferBuilder& builder)
         axe.Union());
 
     builder.Finish(orc);
+
+    instruction = "@MONSTER@";
+    return true;
 }
 
 void Client::stop()
